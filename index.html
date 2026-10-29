@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#202122" />
+  <title>Digital Graveyard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Новые стили для мессенджера, комментариев и кнопок карточек */
+    .dialogs-button {
+      border: 1px solid #665474;
+      background: transparent;
+      color: #c9a9ed;
+      padding: 9px 11px;
+      font: 9px var(--mono);
+      letter-spacing: .04em;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all .2s;
+      margin-left: 8px;
+    }
+    .dialogs-button:hover {
+      background: #bb8cff12;
+      border-color: var(--violet);
+      color: #e1caff;
+    }
+
+    .grave-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .view-secret-btn,
+    .message-author-btn,
+    .comments-toggle-btn {
+      border: 1px solid #545556;
+      background: transparent;
+      color: #aaa9a6;
+      padding: 7px 8px;
+      font: 9px var(--mono);
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .view-secret-btn:hover,
+    .message-author-btn:hover,
+    .comments-toggle-btn:hover {
+      border-color: var(--violet);
+      color: var(--violet);
+    }
+
+    .comments-box {
+      display: none;
+      margin-top: 12px;
+      border: 1px solid #555;
+      background: #202122;
+      padding: 12px;
+    }
+    .comments-box.open {
+      display: block;
+    }
+    .comments-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    .comment-item {
+      border-bottom: 1px solid #3a3b3c;
+      padding: 6px 0;
+    }
+    .comment-meta {
+      font: 8px var(--mono);
+      color: #888;
+    }
+    .comment-text {
+      font: 11px/1.5 var(--display);
+      color: #ddd;
+      margin-top: 2px;
+    }
+    .comment-empty {
+      color: #888;
+      font: 9px var(--mono);
+      text-align: center;
+      padding: 10px;
+    }
+    .comment-form {
+      display: flex;
+      gap: 8px;
+    }
+    .comment-form input {
+      flex: 1;
+      background: #1a1b1c;
+      border: 1px solid #555;
+      color: #eee;
+      padding: 8px;
+      font: 10px var(--mono);
+    }
+    .comment-form button {
+      border: 1px solid var(--violet);
+      background: transparent;
+      color: var(--violet);
+      padding: 8px 12px;
+      font: 9px var(--mono);
+      cursor: pointer;
+    }
+    .comment-form button:hover {
+      background: var(--violet);
+      color: #202122;
+    }
+    .comment-warning {
+      display: none;
+      color: var(--pink);
+      font: 9px var(--mono);
+      margin-top: 8px;
+    }
+
+    .messenger-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #131415f0;
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .messenger-window {
+      width: 90vw;
+      max-width: 1000px;
+      height: 80vh;
+      background: #1e1f20;
+      border: 1px solid var(--violet);
+      display: flex;
+      position: relative;
+      box-shadow: 0 0 40px #bb8cff33;
+    }
+    .messenger-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: transparent;
+      border: 1px solid #555;
+      color: #aaa;
+      padding: 6px 10px;
+      font: 12px var(--mono);
+      cursor: pointer;
+      z-index: 2;
+    }
+    .messenger-sidebar {
+      width: 280px;
+      border-right: 1px solid #444;
+      display: flex;
+      flex-direction: column;
+    }
+    .messenger-sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid #444;
+      font: 11px var(--mono);
+      color: var(--violet);
+      letter-spacing: .08em;
+    }
+    .conversation-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .conversation-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+      cursor: pointer;
+    }
+    .conversation-item:hover,
+    .conversation-item.active {
+      background: #2a2b2c;
+    }
+    .conversation-name {
+      font: 11px var(--mono);
+      color: #eee;
+    }
+    .conversation-preview {
+      font: 9px var(--mono);
+      color: #888;
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .empty-conversations {
+      padding: 20px;
+      color: #888;
+      font: 10px var(--mono);
+      text-align: center;
+    }
+    .messenger-chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-header {
+      padding: 16px;
+      border-bottom: 1px solid #444;
+      font: 11px var(--mono);
+      color: #eee;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .message-bubble {
+      max-width: 70%;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font: 11px/1.5 var(--mono);
+      position: relative;
+    }
+    .message-bubble.own {
+      align-self: flex-end;
+      background: var(--violet);
+      color: #202122;
+    }
+    .message-bubble.other {
+      align-self: flex-start;
+      background: #2a2b2c;
+      color: #ddd;
+      border: 1px solid #444;
+    }
+    .message-time {
+      font: 7px var(--mono);
+      color: #888;
+      margin-top: 4px;
+      text-align: right;
+    }
+    .message-bubble.own .message-time {
+      color: #202122;
+      opacity: 0.6;
+    }
+    .chat-input-area {
+      padding: 12px;
+      border-top: 1px solid #444;
+      display: flex;
+      gap: 8px;
+    }
+    .chat-input-area input {
+      flex: 1;
+      background: #1a1b1c;
+      border: 1px solid #555;
+      color: #eee;
+      padding: 10px;
+      font: 11px var(--mono);
+    }
+    .chat-input-area button {
+      border: 1px solid var(--violet);
+      background: var(--violet);
+      color: #202122;
+      padding: 10px 16px;
+      font: 10px var(--mono);
+      cursor: pointer;
+    }
+    .chat-input-area button:hover {
+      background: #cdaaff;
+    }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="The Digital Graveyard — начало">
+      <span class="brand-mark">†</span>
+      <span>TDG<span class="brand-dot">.</span></span>
+    </a>
+    <div class="top-note">
+      <span class="live-dot"></span> ЦИФРОВОЕ КЛАДБИЩЕ <span class="top-slash">/</span> СЕЗОН 01
+    </div>
+    <button class="account-button" id="account-button" aria-label="Войти или открыть аккаунт">
+      <span>◉</span> Войти
+    </button>
+    <button class="dialogs-button" id="open-dialogs">Мои Диалоги 💬</button>
+    <button class="support-button" id="open-support" aria-label="Техническая поддержка">ТЕХ.ПОДДЕРЖКА</button>
+    <button class="top-add" id="open-create"><span>+</span> Похоронить проект</button>
+  </header>
+  <main id="top">
+    <section class="intro">
+      <div class="intro-copy">
+        <div class="eyebrow">
+          <span>АРХИВ НЕСЛУЧИВШИХСЯ БУДУЩИХ</span>
+          <span class="eyebrow-line"></span>
+          <span>№ 001—∞</span>
+        </div>
+        <h1>THE DIGITAL<br><span>GRAVEYARD</span><i>†</i></h1>
+        <p class="intro-text">Здесь покоятся стартапы, которым просто<br class="desktop-break"> не хватило ещё одного понедельника.</p>
+        <div class="intro-bottom">
+          <span class="tiny-cross">✳</span>
+          <span>ПЕРЕЗАХОРОНИТЬ — ЗНАЧИТ ДАТЬ ЕЩЁ ОДИН ШАНС</span>
+        </div>
+      </div>
+      <aside class="grave-counter" aria-label="Статистика кладбища">
+        <div class="counter-head">В АРХИВЕ <span>●</span></div>
+        <div class="counter-number" id="grave-count">000</div>
+        <div class="counter-rule"></div>
+        <div class="counter-foot">
+          <span>ПОКОЯТСЯ</span>
+          <span id="rose-total">000 🌹</span>
+        </div>
+        <div class="counter-coordinate">55°45' N / 37°37' E</div>
+      </aside>
+      <div class="orbit orbit-one" aria-hidden="true">†</div>
+      <div class="orbit orbit-two" aria-hidden="true">✳</div>
+    </section>
+    <section class="archive" aria-labelledby="archive-title">
+      <div class="archive-heading">
+        <div>
+          <div class="section-kicker">01 / МЕМОРИАЛЬНЫЙ РЕЕСТР</div>
+          <h2 id="archive-title">Последние упокоенные</h2>
+        </div>
+        <div class="sort-note">
+          <span class="sort-dot"></span> СВЕЖИЕ ПОТЕРИ <span class="sort-number">↓</span>
+        </div>
+      </div>
+      <div class="grave-grid" id="grave-grid" aria-live="polite"></div>
+      <div class="empty-state" id="empty-state" hidden>
+        <span>†</span>
+        <p>Пока здесь тихо.</p>
+        <button id="empty-create">Положить первый проект</button>
+      </div>
+    </section>
+    <footer class="site-foot">
+      <span>ОСТАНКИ КОДА, НЕЗАКРЫТЫЕ ВКЛАДКИ И БОЛЬШИЕ НАДЕЖДЫ.</span>
+      <span>TDG © MMXXV <b>†</b></span>
+    </footer>
+  </main>
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" id="modal">
+      <button class="modal-close" id="modal-close" aria-label="Закрыть">×</button>
+      <div id="modal-content"></div>
+    </section>
+  </div>
+  <div class="messenger-modal" id="messenger-modal" style="display:none;">
+    <div class="messenger-window">
+      <button class="messenger-close" id="messenger-close">×</button>
+      <div class="messenger-sidebar">
+        <div class="messenger-sidebar-header">МОИ ДИАЛОГИ</div>
+        <div class="conversation-list" id="conversation-list"></div>
+      </div>
+      <div class="messenger-chat">
+        <div class="chat-header" id="chat-header">Выберите собеседника</div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-area" id="chat-input-area" style="display:none;">
+          <input type="text" id="chat-input" placeholder="Написать сообщение..." maxlength="1000">
+          <button id="chat-send">Отправить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Подключаем Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <script>
+    // Твой URL, который мы только что нашли на скриншоте
+    const SUPABASE_URL = 'https://giswoybbpehorgnsxyna.supabase.co';
+    
+    // СЮДА ВСТАВЬ КЛЮЧ "anon public", который ты скопировал на прошлом шаге (он длинный, начинается с eyJ...)
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpc3dveWJicGVob3JnbnN4eW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzkyOTAsImV4cCI6MjEwODg1NTI5MH0.NrUr4HXUDganShczRSKP2IRw39YYE-69UWv7aW9YDlk';
+
+    window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  </script>
+  
+  <!-- Наш скрипт -->
+  <script src="app.js" defer></script>
+</body>
+</html>
