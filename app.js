@@ -1,3 +1,9 @@
+// Проверка, что Supabase подключен в index.html
+if (!window.supabase) {
+  console.error("Supabase не подключен! Проверь index.html");
+  alert("Ошибка: База данных не подключена. Проверьте файл index.html.");
+}
+
 const db = window.supabase;
 
 const grid = document.getElementById('grave-grid');
@@ -12,7 +18,6 @@ let activeChatUserName = null;
 
 // ================= СЛОВАРИ И ПРАВИЛА =================
 
-// Разрешенные категории (Другое удалено)
 const ALLOWED_CATEGORIES = [
   'Социальное', 'Web3', 'Маркетплейс', 'Искусственный интеллект', 'Игры', 'Приложение'
 ];
@@ -49,7 +54,6 @@ function isNonsense(text) {
   if (/(.)\1{3,}/.test(t)) return true; 
   if (/(.{2,})\1{2,}/.test(t)) return true; 
   
-  // Если есть слово длиннее 15 букв без пробелов
   if (/[а-яa-z]{15,}/i.test(t)) return true;
   
   const keyboardMashes = ['йцукен', 'фывапр', 'ячсмит', 'qwerty', 'asdfgh', 'zxcvbn', '123456', 'ываол', 'цйукк'];
@@ -80,7 +84,7 @@ function isCategoryRelevant(title, description, category) {
   return keywords.some(k => text.includes(k));
 }
 
-// ================= АВТО-УДАЛЕНИЕ (КАЖДЫЕ 10 СЕК) =================
+// ================= АВТО-УДАЛЕНИЕ =================
 let isSweeping = false;
 async function moderationSweep() {
   if (isSweeping) return;
@@ -462,7 +466,6 @@ modalContent?.addEventListener('submit', async (e) => {
 
     btn.disabled = true; btn.textContent = 'ОТПРАВКА...';
     
-    // Сохраняем в базу данных Supabase
     const { error } = await db.from('support_messages').insert([{
       message: message,
       user_email: currentUser ? currentUser.email : 'Гость (не авторизован)'
