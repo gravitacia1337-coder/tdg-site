@@ -10,7 +10,6 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* Новые стили для мессенджера, комментариев и кнопок карточек */
     .dialogs-button {
       border: 1px solid #665474;
       background: transparent;
@@ -28,7 +27,6 @@
       border-color: var(--violet);
       color: #e1caff;
     }
-
     .grave-actions {
       display: flex;
       flex-wrap: wrap;
@@ -51,7 +49,6 @@
       border-color: var(--violet);
       color: var(--violet);
     }
-
     .comments-box {
       display: none;
       margin-top: 12px;
@@ -116,7 +113,6 @@
       font: 9px var(--mono);
       margin-top: 8px;
     }
-
     .messenger-modal {
       position: fixed;
       inset: 0;
@@ -334,12 +330,14 @@
       <span>TDG © MMXXV <b>†</b></span>
     </footer>
   </main>
+  
   <div class="modal-backdrop" id="modal-backdrop" hidden>
     <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" id="modal">
       <button class="modal-close" id="modal-close" aria-label="Закрыть">×</button>
       <div id="modal-content"></div>
     </section>
   </div>
+
   <div class="messenger-modal" id="messenger-modal" style="display:none;">
     <div class="messenger-window">
       <button class="messenger-close" id="messenger-close">×</button>
@@ -359,20 +357,18 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <!-- Подключаем Supabase -->
+  <!-- ПОДКЛЮЧЕНИЕ SUPABASE -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <script>
-    // Твой URL, который мы только что нашли на скриншоте
     const SUPABASE_URL = 'https://giswoybbpehorgnsxyna.supabase.co';
     
-    // СЮДА ВСТАВЬ КЛЮЧ "anon public", который ты скопировал на прошлом шаге (он длинный, начинается с eyJ...)
+    // ВНИМАНИЕ: ЕСЛИ КЛЮЧА НЕТ, ВСТАВЬ СВОЙ ДЛИННЫЙ КЛЮЧ ANON PUBLIC (начинается с eyJ...)
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdpc3dveWJicGVob3JnbnN4eW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzkyOTAsImV4cCI6MjEwODg1NTI5MH0.NrUr4HXUDganShczRSKP2IRw39YYE-69UWv7aW9YDlk';
-
+    
     window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   </script>
   
-  <!-- Наш скрипт -->
   <script src="app.js" defer></script>
 </body>
 </html>
