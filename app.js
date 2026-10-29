@@ -1,9 +1,3 @@
-// Проверка, что Supabase подключен в index.html
-if (!window.supabase) {
-  console.error("Supabase не подключен! Проверь index.html");
-  alert("Ошибка: База данных не подключена. Проверьте файл index.html.");
-}
-
 const db = window.supabase;
 
 const grid = document.getElementById('grave-grid');
