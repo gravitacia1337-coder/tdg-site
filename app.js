@@ -10,25 +10,41 @@ let messages = [];
 let activeChatUserId = null;
 let activeChatUserName = null;
 
-// ================= МОДЕРАЦИЯ =================
-const BAD_WORDS_RE = /(^|[^\p{L}\p{N}])(?:пенис\p{L}*|вагин\p{L}*|вульв\p{L}*|порн\p{L}*|эротик\p{L}*|сперм\p{L}*|минет\p{L}*|куни\p{L}*|дроч\p{L}*|секс\p{L}*|хуй\p{L}*|пизд\p{L}*|еб(?:ать|у|л|ан|н|ись|ени|аш|ну|ал|ла)\p{L}*|бляд\p{L}*|манда\p{L}*|гандон\p{L}*|пидор\p{L}*|педик\p{L}*|сука\p{L}*|сучк\p{L}*|хер\p{L}*|fuck\p{L}*|shit\p{L}*|porn\p{L}*|penis\p{L}*|vagina\p{L}*|dick\p{L}*|cock\p{L}*|sex\p{L}*|nude\p{L}*|xxx)(?=$|[^\p{L}\p{N}])/iu;
+// ================= СТРОГАЯ МОДЕРАЦИЯ =================
+// Добавлены детские ругательства, анатомия, обзывательства и английский спам
+const BAD_WORDS_RE = /(^|[^\p{L}\p{N}])(?:пенис\p{L}*|вагин\p{L}*|вульв\p{L}*|порн\p{L}*|эротик\p{L}*|сперм\p{L}*|минет\p{L}*|куни\p{L}*|дроч\p{L}*|секс\p{L}*|хуй\p{L}*|хуе\p{L}*|хуи\p{L}*|пизд\p{L}*|еб(?:ать|у|л|ан|н|ись|ени|аш|ну|ал|ла)\p{L}*|бляд\p{L}*|манда\p{L}*|гандон\p{L}*|пидор\p{L}*|педик\p{L}*|сука\p{L}*|сучк\p{L}*|хер\p{L}*|залуп\p{L}*|мудак\p{L}*|мудил\p{L}*|fuck\p{L}*|shit\p{L}*|porn\p{L}*|penis\p{L}*|vagina\p{L}*|dick\p{L}*|cock\p{L}*|sex\p{L}*|nude\p{L}*|xxx|попа|жопа|кака|говно|дерьмо|писька|писюн|сиськи|сисек|дурак|дура|тупой|тупая|тупые|kaka|poop|ass|butt|pussy)(?=$|[^\p{L}\p{N}])/iu;
 
 function isNonsense(text) {
   const t = text.trim().toLowerCase();
   if (t.length < 3) return true;
+  
+  // Полный повтор (аааааа, ыыыы)
   if (/(.)\1{3,}/.test(t)) return true;
+  // Повтор слогов (абабаб, какака, asdasd)
   if (/(.{2,})\1{2,}/.test(t)) return true;
+  
+  // Спам с клавиатуры
   const keyboardMashes = ['йцукен', 'фывапр', 'ячсмит', 'qwerty', 'asdfgh', 'zxcvbn', '123456', 'ываол', 'цйукк'];
   if (keyboardMashes.some(mash => t.includes(mash))) return true;
+  
+  // Скопление согласных (более 4 подряд)
   if (/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]{5,}/i.test(t)) return true;
+
+  // Слова без гласных букв (длиннее 3 символов)
   const words = t.split(/\s+/);
   for (let w of words) {
       if (w.length > 3 && !/[аеёиоуыэюяaeiouy]/.test(w)) return true;
   }
+
   const vowels = (t.match(/[аеёиоуыэюяaeiouy]/g) || []).length;
   const consonants = (t.match(/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]/g) || []).length;
+  
   if (vowels === 0 && consonants > 2) return true;
   if (consonants === 0 && vowels > 2) return true;
+  
+  // Если текст короче 5 символов, и в нем нет пробелов - это подозрительно (отсекает "попа", "кака")
+  if (t.length < 5 && !t.includes(' ')) return true;
+
   return false;
 }
 
@@ -36,8 +52,13 @@ function validateTextAI(text) {
   const t = String(text || '').trim();
   if (t.length < 2) return { ok: false, msg: 'Слишком коротко.' };
   const normalized = t.normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
-  if (BAD_WORDS_RE.test(normalized)) return { ok: false, msg: 'Нецензурная лексика.' };
+  
+  // Проверка на мат и пошлости
+  if (BAD_WORDS_RE.test(normalized)) return { ok: false, msg: 'Нецензурная лексика или пошлость.' };
+  
+  // Проверка на бессмыслицу
   if (isNonsense(t)) return { ok: false, msg: 'Бессмысленный набор символов или спам.' };
+  
   return { ok: true };
 }
 
