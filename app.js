@@ -11,8 +11,6 @@ let activeChatUserId = null;
 let activeChatUserName = null;
 
 // ================= СЛОВАРИ ДЛЯ ИИ-ФИЛЬТРА =================
-
-// 1. Запрещенные слова (маты, пошлости, обзывательства)
 const BAD_WORDS_LIST = [
   'хуй', 'хуе', 'хуи', 'пизд', 'ебан', 'ебал', 'ебат', 'ебал', 'бляд', 'блят', 'сука', 'сучк',
   'манда', 'пидор', 'педик', 'гандон', 'залуп', 'мудак', 'мудил', 'хер', 'порн', 'эрот',
@@ -21,7 +19,6 @@ const BAD_WORDS_LIST = [
   'kaka', 'poop', 'ass', 'butt', 'pussy', 'fuck', 'shit', 'porn', 'sex', 'dick', 'cock'
 ];
 
-// 2. Ключевые слова для проверки категорий
 const CATEGORY_KEYWORDS = {
   'Социальное': ['социал', 'общен', 'люди', 'друз', 'связ', 'чат', 'сеть', 'комьюнити', 'сообществ', 'блог', 'форум', 'знаком', 'профил', 'подпис', 'лайк'],
   'Web3': ['web3', 'блокчейн', 'крипт', 'токен', 'nft', 'кошел', 'децентрал', 'смарт', 'контракт', 'эфир', 'биткоин', 'монет', 'майнин'],
@@ -31,7 +28,6 @@ const CATEGORY_KEYWORDS = {
   'Приложение': ['прилож', 'софт', 'программ', 'сервис', 'мобил', 'утилит', 'интерфейс', 'клиент', 'сайт', 'веб', 'телеграм', 'бот', 'андроид', 'ios']
 };
 
-// Проверка на маты (ищет точное совпадение слова или начало слова)
 function hasBadWords(text) {
   const t = text.toLowerCase().replace(/ё/g, 'е');
   for (let word of BAD_WORDS_LIST) {
@@ -41,30 +37,25 @@ function hasBadWords(text) {
   return false;
 }
 
-// Проверка на бессмыслицу
 function isNonsense(text) {
   const t = text.trim().toLowerCase();
   if (t.length < 3) return true;
-  if (/(.)\1{3,}/.test(t)) return true; // ааааа, ыыыы
-  if (/(.{2,})\1{2,}/.test(t)) return true; // абабаб, какака
+  if (/(.)\1{3,}/.test(t)) return true; 
+  if (/(.{2,})\1{2,}/.test(t)) return true; 
   
   const keyboardMashes = ['йцукен', 'фывапр', 'ячсмит', 'qwerty', 'asdfgh', 'zxcvbn', '123456', 'ываол', 'цйукк'];
   if (keyboardMashes.some(mash => t.includes(mash))) return true;
   
-  if (/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]{5,}/i.test(t)) return true; // 5 согласных подряд
+  if (/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]{5,}/i.test(t)) return true;
 
   const words = t.split(/\s+/);
   for (let w of words) {
-    if (w.length > 3 && !/[аеёиоуыэюяaeiouy]/.test(w)) return true; // слово без гласных
+    if (w.length > 3 && !/[аеёиоуыэюяaeiouy]/.test(w)) return true;
   }
-
-  // Слишком короткое название без пробелов
   if (t.length < 5 && !t.includes(' ')) return true;
-
   return false;
 }
 
-// Главная функция проверки текста
 function validateTextAI(text) {
   const t = String(text || '').trim();
   if (t.length < 2) return { ok: false, msg: 'Слишком коротко.' };
@@ -73,12 +64,52 @@ function validateTextAI(text) {
   return { ok: true };
 }
 
-// Проверка соответствия категории
 function isCategoryRelevant(title, description, category) {
+  if (!category) return false;
   const text = (title + ' ' + description).toLowerCase();
   const keywords = CATEGORY_KEYWORDS[category] || [];
   return keywords.some(k => text.includes(k));
 }
+
+// ================= АВТО-МОДЕРАЦИЯ (КАЖДЫЕ 10 СЕК) =================
+let isSweeping = false;
+async function moderationSweep() {
+  if (isSweeping) return;
+  isSweeping = true;
+  
+  try {
+    // Запрашиваем все проекты из базы
+    const { data: allProjects, error } = await db.from('projects').select('*');
+    if (error) throw error;
+    
+    let deletedCount = 0;
+    
+    for (const p of allProjects) {
+      const titleCheck = validateTextAI(p.title);
+      const descCheck = p.description ? validateTextAI(p.description) : { ok: true };
+      const catCheck = isCategoryRelevant(p.title, p.description || '', p.category || '');
+      
+      // Если есть нарушение — УДАЛЯЕМ из базы
+      if (!titleCheck.ok || !descCheck.ok || !catCheck) {
+        await db.from('projects').delete().eq('id', p.id);
+        deletedCount++;
+      }
+    }
+    
+    // Если что-то удалили, обновляем экран
+    if (deletedCount > 0) {
+      loadProjects();
+      showToast(`ИИ-смотритель удалил ${deletedCount} нарушающих правила проектов.`);
+    }
+  } catch (err) {
+    console.error("Ошибка при очистке:", err);
+  } finally {
+    isSweeping = false;
+  }
+}
+
+// Запускаем проверку каждые 10 секунд
+setInterval(moderationSweep, 10000);
 
 // ================= АВТОРИЗАЦИЯ =================
 db.auth.onAuthStateChange((event, session) => {
@@ -267,7 +298,7 @@ function supportModal() {
 document.getElementById('open-create')?.addEventListener('click', () => {
   if (!currentUser) return showToast('Сначала войдите в аккаунт!');
   
-  // ВНИМАНИЕ: Опция "Другое" удалена из списка!
+  // ВНИМАНИЕ: Опция "Другое" удалена!
   openModal(`
     <div class="modal-kicker">РИТУАЛ ЗАХОРОНЕНИЯ / 01</div>
     <h3 id="modal-title">Пусть проект<br>найдёт покой.</h3>
