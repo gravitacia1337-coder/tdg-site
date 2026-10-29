@@ -10,7 +10,13 @@ let messages = [];
 let activeChatUserId = null;
 let activeChatUserName = null;
 
-// ================= СЛОВАРИ ДЛЯ ИИ-ФИЛЬТРА =================
+// ================= СЛОВАРИ И ПРАВИЛА =================
+
+// Разрешенные категории (Другое удалено)
+const ALLOWED_CATEGORIES = [
+  'Социальное', 'Web3', 'Маркетплейс', 'Искусственный интеллект', 'Игры', 'Приложение'
+];
+
 const BAD_WORDS_LIST = [
   'хуй', 'хуе', 'хуи', 'пизд', 'ебан', 'ебал', 'ебат', 'ебал', 'бляд', 'блят', 'сука', 'сучк',
   'манда', 'пидор', 'педик', 'гандон', 'залуп', 'мудак', 'мудил', 'хер', 'порн', 'эрот',
@@ -43,6 +49,9 @@ function isNonsense(text) {
   if (/(.)\1{3,}/.test(t)) return true; 
   if (/(.{2,})\1{2,}/.test(t)) return true; 
   
+  // Если есть слово длиннее 15 букв без пробелов (ловит "скопопендрякнига")
+  if (/[а-яa-z]{15,}/i.test(t)) return true;
+  
   const keyboardMashes = ['йцукен', 'фывапр', 'ячсмит', 'qwerty', 'asdfgh', 'zxcvbn', '123456', 'ываол', 'цйукк'];
   if (keyboardMashes.some(mash => t.includes(mash))) return true;
   
@@ -65,38 +74,42 @@ function validateTextAI(text) {
 }
 
 function isCategoryRelevant(title, description, category) {
-  if (!category) return false;
+  if (!ALLOWED_CATEGORIES.includes(category)) return false;
   const text = (title + ' ' + description).toLowerCase();
   const keywords = CATEGORY_KEYWORDS[category] || [];
   return keywords.some(k => text.includes(k));
 }
 
-// ================= АВТО-МОДЕРАЦИЯ (КАЖДЫЕ 10 СЕК) =================
+// ================= АВТО-УДАЛЕНИЕ (КАЖДЫЕ 10 СЕК) =================
 let isSweeping = false;
 async function moderationSweep() {
   if (isSweeping) return;
   isSweeping = true;
   
   try {
-    // Запрашиваем все проекты из базы
     const { data: allProjects, error } = await db.from('projects').select('*');
     if (error) throw error;
     
     let deletedCount = 0;
     
     for (const p of allProjects) {
+      // Если категория "Другое" (или любой другой мусор) — УДАЛЯЕМ
+      if (!ALLOWED_CATEGORIES.includes(p.category)) {
+        await db.from('projects').delete().eq('id', p.id);
+        deletedCount++;
+        continue;
+      }
+
       const titleCheck = validateTextAI(p.title);
       const descCheck = p.description ? validateTextAI(p.description) : { ok: true };
-      const catCheck = isCategoryRelevant(p.title, p.description || '', p.category || '');
+      const catCheck = isCategoryRelevant(p.title, p.description || '', p.category);
       
-      // Если есть нарушение — УДАЛЯЕМ из базы
       if (!titleCheck.ok || !descCheck.ok || !catCheck) {
         await db.from('projects').delete().eq('id', p.id);
         deletedCount++;
       }
     }
     
-    // Если что-то удалили, обновляем экран
     if (deletedCount > 0) {
       loadProjects();
       showToast(`ИИ-смотритель удалил ${deletedCount} нарушающих правила проектов.`);
@@ -298,7 +311,7 @@ function supportModal() {
 document.getElementById('open-create')?.addEventListener('click', () => {
   if (!currentUser) return showToast('Сначала войдите в аккаунт!');
   
-  // ВНИМАНИЕ: Опция "Другое" удалена!
+  // ВНИМАНИЕ: Опция "Другое" удалена из списка!
   openModal(`
     <div class="modal-kicker">РИТУАЛ ЗАХОРОНЕНИЯ / 01</div>
     <h3 id="modal-title">Пусть проект<br>найдёт покой.</h3>
@@ -400,17 +413,24 @@ modalContent?.addEventListener('submit', async (e) => {
     const category = form.category.value;
     const modResult = document.getElementById('moderation-result');
     
-    // 1. Проверка на маты и бессмыслицу в названии
+    // 1. Проверка категории
+    if (!ALLOWED_CATEGORIES.includes(category)) {
+      modResult.className = 'moderation-result blocked'; 
+      modResult.textContent = 'ИИ отклонил: Неверная категория.'; 
+      return;
+    }
+
+    // 2. Проверка на маты и бессмыслицу в названии
     const titleCheck = validateTextAI(title);
     if (!titleCheck.ok) { modResult.className = 'moderation-result blocked'; modResult.textContent = 'ИИ отклонил название: ' + titleCheck.msg; return; }
     
-    // 2. Проверка на маты и бессмыслицу в описании
+    // 3. Проверка на маты и бессмыслицу в описании
     if (desc) {
       const descCheck = validateTextAI(desc);
       if (!descCheck.ok) { modResult.className = 'moderation-result blocked'; modResult.textContent = 'ИИ отклонил описание: ' + descCheck.msg; return; }
     }
 
-    // 3. Проверка соответствия выбранной категории
+    // 4. Проверка соответствия выбранной категории
     if (!isCategoryRelevant(title, desc, category)) {
       modResult.className = 'moderation-result blocked'; 
       modResult.textContent = `ИИ отклонил проект: Ваше название и описание не соответствуют категории «${category}». Пожалуйста, добавьте ключевые слова по теме.`; 
