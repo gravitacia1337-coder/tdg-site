@@ -43,25 +43,19 @@ function validateTextAI(text) {
 
 // ================= АВТОРИЗАЦИЯ =================
 db.auth.onAuthStateChange((event, session) => {
-  if (event === 'PASSWORD_RECOVERY') {
-    showPasswordResetForm();
-    return;
-  }
+  if (event === 'PASSWORD_RECOVERY') { showPasswordResetForm(); return; }
   if (session) {
     currentUser = {
       id: session.user.id,
       email: session.user.email,
-      username: session.user.user_metadata?.username || session.user.email.split('@')[0]
+      username: session.user.user_metadata?.username || session.user.user_metadata?.full_name || session.user.email.split('@')[0]
     };
   } else {
     currentUser = null;
   }
   updateAccountButton();
   loadProjects();
-  if (currentUser) {
-    loadMessages();
-    setupRealtimeMessages();
-  }
+  if (currentUser) { loadMessages(); setupRealtimeMessages(); }
 });
 
 function updateAccountButton() {
@@ -88,10 +82,7 @@ function setupRealtimeMessages() {
   realtimeSub = db.channel('public:messages')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
       if (currentUser && (payload.new.sender_id === currentUser.id || payload.new.receiver_id === currentUser.id)) {
-        if (!messages.find(m => m.id === payload.new.id)) {
-          messages.push(payload.new);
-          renderMessenger();
-        }
+        if (!messages.find(m => m.id === payload.new.id)) { messages.push(payload.new); renderMessenger(); }
       }
     }).subscribe();
 }
@@ -101,10 +92,8 @@ function render() {
   if (!grid) return;
   const emptyEl = document.getElementById('empty-state');
   if (emptyEl) emptyEl.hidden = projects.length !== 0;
-  
   const countEl = document.getElementById('grave-count');
   if (countEl) countEl.textContent = String(projects.length).padStart(3, '0');
-  
   const roseEl = document.getElementById('rose-total');
   if (roseEl) {
     const totalRoses = projects.reduce((sum, p) => sum + (p.liked_by?.length || 0), 0);
@@ -128,13 +117,10 @@ function render() {
     }
     html += `<button class="comments-toggle-btn" data-action="toggle-comments">Комментарии (${(p.comments || []).length})</button>`;
     html += `</div></div>`;
-    
     let secretHtml = p.secret ? `<div class="secret-content">${p.secret}</div>` : `<div class="secret-content">Файл не приложен.</div>`;
     html += `<div class="secret-box" data-secret-box style="display:none;">${secretHtml}</div>`;
-    
     let commentsHtml = (p.comments || []).map(c => `<div class="comment-item"><div class="comment-meta">${c.userName} · ${new Date(c.createdAt).toLocaleString()}</div><div class="comment-text">${c.text}</div></div>`).join('');
     if (!commentsHtml) commentsHtml = '<div class="comment-empty">Пока нет мыслей.</div>';
-    
     html += `<div class="comments-box" data-comments-box><div class="comments-list">${commentsHtml}</div>`;
     html += `<form class="comment-form" data-comment-form><input name="comment" placeholder="Оставить мысль..." maxlength="500"><button type="submit">Отправить</button></form><div class="comment-warning" style="display:none;"></div></div>`;
     html += `</article>`;
@@ -160,7 +146,7 @@ function showToast(text) {
   const el = document.getElementById('toast');
   if (!el) return;
   el.textContent = text; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 4000); // Сделал подольше, чтобы читалось
+  setTimeout(() => el.classList.remove('show'), 4000);
 }
 
 function showPasswordResetForm() {
@@ -180,6 +166,13 @@ function openAuthModal(mode = 'login') {
   openModal(`
     <div class="modal-kicker">ЛИЧНОСТЬ / ДОСТУП В АРХИВ</div>
     <h3 id="modal-title">${isLogin ? 'Вход в архив' : 'Регистрация'}</h3>
+    
+    <button type="button" id="google-login-btn" style="width:100%; border:1px solid #444; background:#222; color:white; display:flex; align-items:center; justify-content:center; gap:10px; padding:12px; margin-bottom:15px; cursor:pointer; font:10px var(--mono); transition:0.2s;">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Войти через Google
+    </button>
+    <div style="text-align:center; color:#666; font:10px var(--mono); margin-bottom:15px;">ИЛИ ЧЕРЕЗ ПОЧТУ</div>
+
     <form id="auth-form" data-mode="${mode}">
       ${!isLogin ? '<label class="field full"><span class="form-label">ИМЯ (Ник)</span><input type="text" name="username" placeholder="gravekeeper"></label>' : ''}
       <label class="field full" style="margin-top:14px"><span class="form-label">EMAIL <em>*</em></span><input type="email" name="email" required placeholder="you@example.com"></label>
@@ -193,14 +186,20 @@ function openAuthModal(mode = 'login') {
     </form>
   `);
 
+  document.getElementById('google-login-btn').onclick = async () => {
+    const { error } = await db.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + window.location.pathname }
+    });
+    if (error) showToast('Ошибка: ' + error.message);
+  };
+
   document.getElementById('switch-auth').onclick = () => openAuthModal(isLogin ? 'register' : 'login');
-  
   if (isLogin) {
     document.getElementById('forgot-pwd-btn').onclick = () => {
       openModal(`
         <div class="modal-kicker">ВОССТАНОВЛЕНИЕ</div>
         <h3 id="modal-title">Сброс пароля</h3>
-        <p style="font-size:12px;color:#aaa;margin-bottom:15px;">Укажите email, на который зарегистрирован аккаунт. Мы отправим ссылку.</p>
         <form id="forgot-form">
           <label class="field full"><span class="form-label">EMAIL <em>*</em></span><input type="email" name="email" required placeholder="you@example.com"></label>
           <p class="auth-error" style="color:var(--pink);font-size:10px;margin-top:10px;"></p>
@@ -216,7 +215,7 @@ function supportModal() {
   openModal(`
     <div class="modal-kicker">СВЯЗЬ С АВТОРОМ ПРОЕКТА</div>
     <h3 id="modal-title">Техническая<br>поддержка.</h3>
-    <p class="modal-lead">Опишите проблему. ИИ проверит сообщение на адекватность и отсутствие матов.</p>
+    <p class="modal-lead">Опишите проблему. ИИ проверит сообщение на адекватность.</p>
     <form id="support-form" class="support-form">
       <label class="field"><span class="form-label">ВАШЕ ОБРАЩЕНИЕ · 12–1500 СИМВОЛОВ</span><textarea name="message" required minlength="12" maxlength="1500" placeholder="Опишите, что случилось…"></textarea></label>
       <div class="support-result" id="support-result" aria-live="polite"></div>
@@ -266,7 +265,6 @@ modalContent?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
 
-  // 1. Восстановление пароля (запрос)
   if (form.id === 'forgot-form') {
     const email = form.email.value;
     const btn = form.querySelector('button[type="submit"]');
@@ -278,7 +276,6 @@ modalContent?.addEventListener('submit', async (e) => {
     return;
   }
 
-  // 2. Установка нового пароля
   if (form.id === 'reset-password-form') {
     const newPassword = form.newPassword.value;
     const btn = form.querySelector('button[type="submit"]');
@@ -290,7 +287,6 @@ modalContent?.addEventListener('submit', async (e) => {
     return;
   }
 
-  // 3. Вход и регистрация
   if (form.id === 'auth-form') {
     const email = form.email.value;
     const password = form.password.value;
@@ -303,12 +299,8 @@ modalContent?.addEventListener('submit', async (e) => {
       const { data, error } = await db.auth.signUp({ email, password, options: { data: { username } } });
       if (error) { errP.textContent = error.message; btn.disabled = false; btn.textContent = 'СОЗДАТЬ АККАУНТ ↗'; }
       else { 
-        // ПРОВЕРКА: если Supabase требует подтверждения, сессии не будет
-        if (data.session === null) {
-          showToast('Аккаунт создан! ПРОВЕРЬТЕ ВАШУ ПОЧТУ (и папку Спам).'); 
-        } else {
-          showToast('Аккаунт создан! Вы вошли.'); 
-        }
+        if (data.session === null) showToast('Аккаунт создан! ПРОВЕРЬТЕ ВАШУ ПОЧТУ (и папку Спам).'); 
+        else showToast('Аккаунт создан! Вы вошли.'); 
         closeModal(); 
       }
     } else {
@@ -319,7 +311,6 @@ modalContent?.addEventListener('submit', async (e) => {
     return;
   }
 
-  // 4. Создание проекта
   if (form.id === 'create-form') {
     const title = form.title.value.trim();
     const secret = form.secret.value.trim();
@@ -335,7 +326,6 @@ modalContent?.addEventListener('submit', async (e) => {
 
     modResult.className = 'moderation-result checking'; modResult.textContent = 'ИИ анализирует...';
     const btn = form.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'ПУБЛИКАЦИЯ...';
-
     await new Promise(r => setTimeout(r, 800));
 
     const { error } = await db.from('projects').insert([{
@@ -348,13 +338,11 @@ modalContent?.addEventListener('submit', async (e) => {
     return;
   }
 
-    // 5. ТЕХНИЧЕСКАЯ ПОДДЕРЖКА (С ИИ-ФИЛЬТРОМ И ЛИМИТОМ)
   if (form.id === 'support-form') {
     const message = form.message.value.trim();
     const result = document.getElementById('support-result');
     const btn = form.querySelector('button[type="submit"]');
 
-    // Проверка лимита (1 час)
     const lastSupportTime = localStorage.getItem('tdg_support_time');
     if (lastSupportTime && Date.now() - Number(lastSupportTime) < 3600000) {
       const minutesLeft = Math.ceil((3600000 - (Date.now() - Number(lastSupportTime))) / 60000);
@@ -363,23 +351,15 @@ modalContent?.addEventListener('submit', async (e) => {
       return;
     }
 
-    // Проверка ИИ (маты, бессмыслица)
     const check = validateTextAI(message);
-    if (!check.ok) {
-      result.className = 'support-result error';
-      result.textContent = 'ИИ-модератор отклонил обращение: ' + check.msg;
-      return;
-    }
+    if (!check.ok) { result.className = 'support-result error'; result.textContent = 'ИИ-модератор отклонил обращение: ' + check.msg; return; }
 
     btn.disabled = true; btn.textContent = 'ОТПРАВКА...';
-    await new Promise(r => setTimeout(r, 600)); // Имитация задержки
+    await new Promise(r => setTimeout(r, 600));
     
-    // Сохраняем локально (для демо)
     const supportMessages = JSON.parse(localStorage.getItem('tdg_support') || '[]');
     supportMessages.push({ message, user: currentUser?.email || 'Гость', date: new Date() });
     localStorage.setItem('tdg_support', JSON.stringify(supportMessages));
-    
-    // Запоминаем время отправки
     localStorage.setItem('tdg_support_time', Date.now().toString());
 
     result.className = 'support-result success';
@@ -389,22 +369,6 @@ modalContent?.addEventListener('submit', async (e) => {
     return;
   }
 
-    btn.disabled = true; btn.textContent = 'ОТПРАВКА...';
-    await new Promise(r => setTimeout(r, 600)); // Имитация задержки
-    
-    // Сохраняем локально (для демо)
-    const supportMessages = JSON.parse(localStorage.getItem('tdg_support') || '[]');
-    supportMessages.push({ message, user: currentUser?.email || 'Гость', date: new Date() });
-    localStorage.setItem('tdg_support', JSON.stringify(supportMessages));
-
-    result.className = 'support-result success';
-    result.textContent = 'ИИ одобрил. Обращение отправлено!';
-    btn.disabled = false; btn.textContent = 'ОТПРАВИТЬ ОБРАЩЕНИЕ ↗';
-    form.reset();
-    return;
-  }
-
-  // 6. Отправка комментария
   if (form.matches('.comment-form')) {
     if (!currentUser) return showToast('Войдите, чтобы комментировать!');
     const card = form.closest('.grave-card');
