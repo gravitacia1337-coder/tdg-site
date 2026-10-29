@@ -348,18 +348,46 @@ modalContent?.addEventListener('submit', async (e) => {
     return;
   }
 
-  // 5. ТЕХНИЧЕСКАЯ ПОДДЕРЖКА (С ИИ-ФИЛЬТРОМ)
+    // 5. ТЕХНИЧЕСКАЯ ПОДДЕРЖКА (С ИИ-ФИЛЬТРОМ И ЛИМИТОМ)
   if (form.id === 'support-form') {
     const message = form.message.value.trim();
     const result = document.getElementById('support-result');
     const btn = form.querySelector('button[type="submit"]');
 
+    // Проверка лимита (1 час)
+    const lastSupportTime = localStorage.getItem('tdg_support_time');
+    if (lastSupportTime && Date.now() - Number(lastSupportTime) < 3600000) {
+      const minutesLeft = Math.ceil((3600000 - (Date.now() - Number(lastSupportTime))) / 60000);
+      result.className = 'support-result error';
+      result.textContent = `Слишком часто. Следующее обращение можно отправить через ${minutesLeft} мин.`;
+      return;
+    }
+
+    // Проверка ИИ (маты, бессмыслица)
     const check = validateTextAI(message);
     if (!check.ok) {
       result.className = 'support-result error';
       result.textContent = 'ИИ-модератор отклонил обращение: ' + check.msg;
       return;
     }
+
+    btn.disabled = true; btn.textContent = 'ОТПРАВКА...';
+    await new Promise(r => setTimeout(r, 600)); // Имитация задержки
+    
+    // Сохраняем локально (для демо)
+    const supportMessages = JSON.parse(localStorage.getItem('tdg_support') || '[]');
+    supportMessages.push({ message, user: currentUser?.email || 'Гость', date: new Date() });
+    localStorage.setItem('tdg_support', JSON.stringify(supportMessages));
+    
+    // Запоминаем время отправки
+    localStorage.setItem('tdg_support_time', Date.now().toString());
+
+    result.className = 'support-result success';
+    result.textContent = 'ИИ одобрил. Обращение отправлено! Следующее можно будет отправить через час.';
+    btn.disabled = false; btn.textContent = 'ОТПРАВИТЬ ОБРАЩЕНИЕ ↗';
+    form.reset();
+    return;
+  }
 
     btn.disabled = true; btn.textContent = 'ОТПРАВКА...';
     await new Promise(r => setTimeout(r, 600)); // Имитация задержки
