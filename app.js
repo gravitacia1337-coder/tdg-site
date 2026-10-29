@@ -10,56 +10,74 @@ let messages = [];
 let activeChatUserId = null;
 let activeChatUserName = null;
 
-// ================= СТРОГАЯ МОДЕРАЦИЯ =================
-// Добавлены детские ругательства, анатомия, обзывательства и английский спам
-const BAD_WORDS_RE = /(^|[^\p{L}\p{N}])(?:пенис\p{L}*|вагин\p{L}*|вульв\p{L}*|порн\p{L}*|эротик\p{L}*|сперм\p{L}*|минет\p{L}*|куни\p{L}*|дроч\p{L}*|секс\p{L}*|хуй\p{L}*|хуе\p{L}*|хуи\p{L}*|пизд\p{L}*|еб(?:ать|у|л|ан|н|ись|ени|аш|ну|ал|ла)\p{L}*|бляд\p{L}*|манда\p{L}*|гандон\p{L}*|пидор\p{L}*|педик\p{L}*|сука\p{L}*|сучк\p{L}*|хер\p{L}*|залуп\p{L}*|мудак\p{L}*|мудил\p{L}*|fuck\p{L}*|shit\p{L}*|porn\p{L}*|penis\p{L}*|vagina\p{L}*|dick\p{L}*|cock\p{L}*|sex\p{L}*|nude\p{L}*|xxx|попа|жопа|кака|говно|дерьмо|писька|писюн|сиськи|сисек|дурак|дура|тупой|тупая|тупые|kaka|poop|ass|butt|pussy)(?=$|[^\p{L}\p{N}])/iu;
+// ================= СЛОВАРИ ДЛЯ ИИ-ФИЛЬТРА =================
 
+// 1. Запрещенные слова (маты, пошлости, обзывательства)
+const BAD_WORDS_LIST = [
+  'хуй', 'хуе', 'хуи', 'пизд', 'ебан', 'ебал', 'ебат', 'ебал', 'бляд', 'блят', 'сука', 'сучк',
+  'манда', 'пидор', 'педик', 'гандон', 'залуп', 'мудак', 'мудил', 'хер', 'порн', 'эрот',
+  'сперм', 'минет', 'куни', 'дроч', 'секс', 'попа', 'жопа', 'кака', 'говно', 'дерьмо', 'писька',
+  'писюн', 'сиськи', 'сисек', 'дурак', 'дура', 'тупой', 'тупая', 'тупые', 'лох', 'чмо',
+  'kaka', 'poop', 'ass', 'butt', 'pussy', 'fuck', 'shit', 'porn', 'sex', 'dick', 'cock'
+];
+
+// 2. Ключевые слова для проверки категорий
+const CATEGORY_KEYWORDS = {
+  'Социальное': ['социал', 'общен', 'люди', 'друз', 'связ', 'чат', 'сеть', 'комьюнити', 'сообществ', 'блог', 'форум', 'знаком', 'профил', 'подпис', 'лайк'],
+  'Web3': ['web3', 'блокчейн', 'крипт', 'токен', 'nft', 'кошел', 'децентрал', 'смарт', 'контракт', 'эфир', 'биткоин', 'монет', 'майнин'],
+  'Маркетплейс': ['маркет', 'площадк', 'торг', 'прода', 'покуп', 'магазин', 'услуг', 'товар', 'доск', 'объявлен', 'барахолк', 'купли', 'авито', 'комисси'],
+  'Искусственный интеллект': ['ии', 'нейросет', 'интеллект', 'машин', 'обучен', 'gpt', 'бот', 'нейрон', 'генерац', 'чатгпт', 'ассистент', 'алгоритм'],
+  'Игры': ['игр', 'геймплей', 'разработ', 'персонаж', 'уровен', 'гейм', 'консол', 'квест', 'шутер', 'стратег', 'ролев', 'rpg', 'моб', 'геймер', 'пиксел'],
+  'Приложение': ['прилож', 'софт', 'программ', 'сервис', 'мобил', 'утилит', 'интерфейс', 'клиент', 'сайт', 'веб', 'телеграм', 'бот', 'андроид', 'ios']
+};
+
+// Проверка на маты (ищет точное совпадение слова или начало слова)
+function hasBadWords(text) {
+  const t = text.toLowerCase().replace(/ё/g, 'е');
+  for (let word of BAD_WORDS_LIST) {
+    const re = new RegExp(`(^|[^а-яa-z])${word}`, 'i');
+    if (re.test(t)) return true;
+  }
+  return false;
+}
+
+// Проверка на бессмыслицу
 function isNonsense(text) {
   const t = text.trim().toLowerCase();
   if (t.length < 3) return true;
+  if (/(.)\1{3,}/.test(t)) return true; // ааааа, ыыыы
+  if (/(.{2,})\1{2,}/.test(t)) return true; // абабаб, какака
   
-  // Полный повтор (аааааа, ыыыы)
-  if (/(.)\1{3,}/.test(t)) return true;
-  // Повтор слогов (абабаб, какака, asdasd)
-  if (/(.{2,})\1{2,}/.test(t)) return true;
-  
-  // Спам с клавиатуры
   const keyboardMashes = ['йцукен', 'фывапр', 'ячсмит', 'qwerty', 'asdfgh', 'zxcvbn', '123456', 'ываол', 'цйукк'];
   if (keyboardMashes.some(mash => t.includes(mash))) return true;
   
-  // Скопление согласных (более 4 подряд)
-  if (/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]{5,}/i.test(t)) return true;
+  if (/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]{5,}/i.test(t)) return true; // 5 согласных подряд
 
-  // Слова без гласных букв (длиннее 3 символов)
   const words = t.split(/\s+/);
   for (let w of words) {
-      if (w.length > 3 && !/[аеёиоуыэюяaeiouy]/.test(w)) return true;
+    if (w.length > 3 && !/[аеёиоуыэюяaeiouy]/.test(w)) return true; // слово без гласных
   }
 
-  const vowels = (t.match(/[аеёиоуыэюяaeiouy]/g) || []).length;
-  const consonants = (t.match(/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]/g) || []).length;
-  
-  if (vowels === 0 && consonants > 2) return true;
-  if (consonants === 0 && vowels > 2) return true;
-  
-  // Если текст короче 5 символов, и в нем нет пробелов - это подозрительно (отсекает "попа", "кака")
+  // Слишком короткое название без пробелов
   if (t.length < 5 && !t.includes(' ')) return true;
 
   return false;
 }
 
+// Главная функция проверки текста
 function validateTextAI(text) {
   const t = String(text || '').trim();
   if (t.length < 2) return { ok: false, msg: 'Слишком коротко.' };
-  const normalized = t.normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
-  
-  // Проверка на мат и пошлости
-  if (BAD_WORDS_RE.test(normalized)) return { ok: false, msg: 'Нецензурная лексика или пошлость.' };
-  
-  // Проверка на бессмыслицу
+  if (hasBadWords(t)) return { ok: false, msg: 'Нецензурная лексика, пошлость или обзывательства.' };
   if (isNonsense(t)) return { ok: false, msg: 'Бессмысленный набор символов или спам.' };
-  
   return { ok: true };
+}
+
+// Проверка соответствия категории
+function isCategoryRelevant(title, description, category) {
+  const text = (title + ' ' + description).toLowerCase();
+  const keywords = CATEGORY_KEYWORDS[category] || [];
+  return keywords.some(k => text.includes(k));
 }
 
 // ================= АВТОРИЗАЦИЯ =================
@@ -248,6 +266,8 @@ function supportModal() {
 // ================= СОБЫТИЯ =================
 document.getElementById('open-create')?.addEventListener('click', () => {
   if (!currentUser) return showToast('Сначала войдите в аккаунт!');
+  
+  // ВНИМАНИЕ: Опция "Другое" удалена из списка!
   openModal(`
     <div class="modal-kicker">РИТУАЛ ЗАХОРОНЕНИЯ / 01</div>
     <h3 id="modal-title">Пусть проект<br>найдёт покой.</h3>
@@ -255,7 +275,17 @@ document.getElementById('open-create')?.addEventListener('click', () => {
       <div class="form-grid">
         <label class="field full"><span class="form-label">НАЗВАНИЕ <em>*</em></span><input name="title" required maxlength="72" placeholder="Амбициозное имя"></label>
         <label class="field full"><span class="form-label">ПОЧЕМУ ПРОЕКТ УМЕР</span><textarea name="description" maxlength="280" placeholder="Инвестор ушёл за кофе…"></textarea></label>
-        <label class="field"><span class="form-label">КАТЕГОРИЯ</span><select name="category" required><option>Социальное</option><option>Web3</option><option>Маркетплейс</option><option>Искусственный интеллект</option><option>Игры</option><option>Приложение</option><option>Другое</option></select></label>
+        <label class="field"><span class="form-label">КАТЕГОРИЯ</span>
+          <select name="category" required>
+            <option value="" disabled selected>Выберите...</option>
+            <option>Социальное</option>
+            <option>Web3</option>
+            <option>Маркетплейс</option>
+            <option>Искусственный интеллект</option>
+            <option>Игры</option>
+            <option>Приложение</option>
+          </select>
+        </label>
         <label class="field full"><span class="form-label">ССЫЛКА НА СКРИНШОТ</span><input name="screenshot" type="url" placeholder="https://..."></label>
         <div class="field full"><span class="form-label">ИСХОДНИКИ / СЕКРЕТНЫЙ ТЕКСТ <em>*</em></span><textarea name="secret" class="secret-input" required></textarea></div>
       </div>
@@ -336,13 +366,24 @@ modalContent?.addEventListener('submit', async (e) => {
     const title = form.title.value.trim();
     const secret = form.secret.value.trim();
     const desc = form.description.value.trim();
+    const category = form.category.value;
     const modResult = document.getElementById('moderation-result');
     
+    // 1. Проверка на маты и бессмыслицу в названии
     const titleCheck = validateTextAI(title);
     if (!titleCheck.ok) { modResult.className = 'moderation-result blocked'; modResult.textContent = 'ИИ отклонил название: ' + titleCheck.msg; return; }
+    
+    // 2. Проверка на маты и бессмыслицу в описании
     if (desc) {
       const descCheck = validateTextAI(desc);
       if (!descCheck.ok) { modResult.className = 'moderation-result blocked'; modResult.textContent = 'ИИ отклонил описание: ' + descCheck.msg; return; }
+    }
+
+    // 3. Проверка соответствия выбранной категории
+    if (!isCategoryRelevant(title, desc, category)) {
+      modResult.className = 'moderation-result blocked'; 
+      modResult.textContent = `ИИ отклонил проект: Ваше название и описание не соответствуют категории «${category}». Пожалуйста, добавьте ключевые слова по теме.`; 
+      return;
     }
 
     modResult.className = 'moderation-result checking'; modResult.textContent = 'ИИ анализирует...';
@@ -350,7 +391,7 @@ modalContent?.addEventListener('submit', async (e) => {
     await new Promise(r => setTimeout(r, 800));
 
     const { error } = await db.from('projects').insert([{
-      title, description: desc, category: form.category.value, screenshot: form.screenshot.value, secret,
+      title, description: desc, category: category, screenshot: form.screenshot.value, secret,
       owner_id: currentUser.id, owner_name: currentUser.username, liked_by: [], comments: []
     }]);
 
