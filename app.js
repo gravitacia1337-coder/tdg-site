@@ -16,6 +16,16 @@ const ALLOWED_CATEGORIES = [
   'Социальное', 'Web3', 'Маркетплейс', 'Искусственный интеллект', 'Игры', 'Приложение'
 ];
 
+// Все слова для подсказок и проверки
+const CATEGORY_KEYWORDS = {
+  'Социальное': ['социал', 'общен', 'люди', 'друз', 'связ', 'чат', 'сеть', 'комьюнити', 'сообществ', 'блог', 'форум', 'знаком', 'профил', 'подпис', 'лайк', 'social', 'friend', 'people', 'chat', 'talk'],
+  'Web3': ['web3', 'блокчейн', 'крипт', 'токен', 'nft', 'кошел', 'децентрал', 'смарт', 'контракт', 'эфир', 'биткоин', 'монет', 'майнин', 'blockchain', 'crypto', 'wallet', 'token', 'ether'],
+  'Маркетплейс': ['маркет', 'паркет', 'площадк', 'торг', 'прода', 'покуп', 'магазин', 'услуг', 'товар', 'доск', 'объявлен', 'барахолк', 'купли', 'авито', 'комисси', 'place', 'shop', 'store', 'sell', 'buy', 'market'],
+  'Искусственный интеллект': ['ии', 'ai', 'нейро', 'нейросет', 'интеллект', 'gpt', 'бот', 'чатгпт', 'машин', 'обуч', 'модел', 'алгор', 'данн', 'openai', 'chatgpt', 'генерац', 'ассистент'],
+  'Игры': ['игр', 'геймплей', 'разработ', 'персонаж', 'уровен', 'гейм', 'консол', 'квест', 'шутер', 'стратег', 'ролев', 'rpg', 'моб', 'геймер', 'пиксел', 'game', 'play', 'player', 'level', 'quest', 'unity', 'unreal'],
+  'Приложение': ['прилож', 'софт', 'программ', 'сервис', 'мобил', 'утилит', 'интерфейс', 'клиент', 'сайт', 'веб', 'телеграм', 'бот', 'андроид', 'ios', 'app', 'site', 'web', 'tool', 'software', 'сервис', 'код']
+};
+
 const BAD_WORDS_LIST = [
   'хуй', 'хуе', 'хуи', 'пизд', 'ебан', 'ебал', 'ебат', 'ебал', 'бляд', 'блят', 'сука', 'сучк',
   'манда', 'пидор', 'педик', 'гандон', 'залуп', 'мудак', 'мудил', 'хер', 'порн', 'эрот',
@@ -23,15 +33,6 @@ const BAD_WORDS_LIST = [
   'писюн', 'сиськи', 'сисек', 'дурак', 'дура', 'тупой', 'тупая', 'тупые', 'лох', 'чмо',
   'kaka', 'poop', 'ass', 'butt', 'pussy', 'fuck', 'shit', 'porn', 'sex', 'dick', 'cock'
 ];
-
-const CATEGORY_KEYWORDS = {
-  'Социальное': ['социал', 'общен', 'люди', 'друз', 'связ', 'чат', 'сеть', 'комьюнити', 'сообществ', 'блог', 'форум', 'знаком', 'профил', 'подпис', 'лайк'],
-  'Web3': ['web3', 'блокчейн', 'крипт', 'токен', 'nft', 'кошел', 'децентрал', 'смарт', 'контракт', 'эфир', 'биткоин', 'монет', 'майнин'],
-  'Маркетплейс': ['маркет', 'площадк', 'торг', 'прода', 'покуп', 'магазин', 'услуг', 'товар', 'доск', 'объявлен', 'барахолк', 'купли', 'авито', 'комисси'],
-  'Искусственный интеллект': ['ии', 'нейросет', 'интеллект', 'машин', 'обучен', 'gpt', 'бот', 'нейрон', 'генерац', 'чатгпт', 'ассистент', 'алгоритм'],
-  'Игры': ['игр', 'геймплей', 'разработ', 'персонаж', 'уровен', 'гейм', 'консол', 'квест', 'шутер', 'стратег', 'ролев', 'rpg', 'моб', 'геймер', 'пиксел'],
-  'Приложение': ['прилож', 'софт', 'программ', 'сервис', 'мобил', 'утилит', 'интерфейс', 'клиент', 'сайт', 'веб', 'телеграм', 'бот', 'андроид', 'ios']
-};
 
 function hasBadWords(text) {
   const t = text.toLowerCase().replace(/ё/g, 'е');
@@ -44,22 +45,11 @@ function hasBadWords(text) {
 
 function isNonsense(text) {
   const t = text.trim().toLowerCase();
-  if (t.length < 3) return true;
-  if (/(.)\1{3,}/.test(t)) return true; 
-  if (/(.{2,})\1{2,}/.test(t)) return true; 
-  
-  if (/[а-яa-z]{15,}/i.test(t)) return true;
-  
+  if (t.length < 2) return true;
+  if (/(.)\1{4,}/.test(t)) return true; 
   const keyboardMashes = ['йцукен', 'фывапр', 'ячсмит', 'qwerty', 'asdfgh', 'zxcvbn', '123456', 'ываол', 'цйукк'];
   if (keyboardMashes.some(mash => t.includes(mash))) return true;
-  
-  if (/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]{5,}/i.test(t)) return true;
-
-  const words = t.split(/\s+/);
-  for (let w of words) {
-    if (w.length > 3 && !/[аеёиоуыэюяaeiouy]/.test(w)) return true;
-  }
-  if (t.length < 5 && !t.includes(' ')) return true;
+  if (/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]{6,}/i.test(t)) return true;
   return false;
 }
 
@@ -314,8 +304,14 @@ document.getElementById('open-create')?.addEventListener('click', () => {
       <div class="form-grid">
         <label class="field full"><span class="form-label">НАЗВАНИЕ <em>*</em></span><input name="title" required maxlength="72" placeholder="Амбициозное имя"></label>
         <label class="field full"><span class="form-label">ПОЧЕМУ ПРОЕКТ УМЕР</span><textarea name="description" maxlength="280" placeholder="Инвестор ушёл за кофе…"></textarea></label>
-        <label class="field"><span class="form-label">КАТЕГОРИЯ</span>
-          <select name="category" required>
+        
+        <!-- БЛОК С КАТЕГОРИЕЙ И КНОПКОЙ ПОДСКАЗОК -->
+        <div class="field" style="position:relative;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:7px;">
+            <span class="form-label">КАТЕГОРИЯ <em>*</em></span>
+            <button type="button" id="show-keywords-btn" style="background:none; border:none; color:var(--violet); font:9px var(--mono); cursor:pointer; text-decoration:underline; padding:0;">Ключевые слова [?]</button>
+          </div>
+          <select name="category" id="category-select" required>
             <option value="" disabled selected>Выберите...</option>
             <option>Социальное</option>
             <option>Web3</option>
@@ -324,7 +320,9 @@ document.getElementById('open-create')?.addEventListener('click', () => {
             <option>Игры</option>
             <option>Приложение</option>
           </select>
-        </label>
+          <div id="keywords-hint" style="display:none; margin-top:8px; padding:10px; border:1px solid #555; background:#1a1b1c; color:#ccc; font:10px/1.5 var(--mono);"></div>
+        </div>
+
         <label class="field full"><span class="form-label">ССЫЛКА НА СКРИНШОТ</span><input name="screenshot" type="url" placeholder="https://..."></label>
         <div class="field full"><span class="form-label">ИСХОДНИКИ / СЕКРЕТНЫЙ ТЕКСТ <em>*</em></span><textarea name="secret" class="secret-input" required></textarea></div>
       </div>
@@ -332,6 +330,30 @@ document.getElementById('open-create')?.addEventListener('click', () => {
       <button class="modal-submit" type="submit">ЗАЖЕЧЬ ПОСЛЕДНЮЮ СВЕЧУ ↗</button>
     </form>
   `);
+
+  // Логика для кнопки "Ключевые слова"
+  setTimeout(() => {
+    const kwBtn = document.getElementById('show-keywords-btn');
+    const catSelect = document.getElementById('category-select');
+    const hint = document.getElementById('keywords-hint');
+    
+    if (kwBtn && catSelect && hint) {
+      kwBtn.onclick = () => {
+        const category = catSelect.value;
+        if (!category) {
+          hint.innerHTML = '<span style="color:var(--pink)">Сначала выберите категорию в списке ниже.</span>';
+        } else {
+          const words = CATEGORY_KEYWORDS[category];
+          if (words && words.length) {
+            hint.innerHTML = `<strong style="color:var(--violet);">ИИ ищет эти слова:</strong><br>${words.join(', ')}`;
+          } else {
+            hint.innerHTML = 'Ключевые слова не найдены.';
+          }
+        }
+        hint.style.display = hint.style.display === 'none' ? 'block' : 'none';
+      };
+    }
+  }, 100);
 });
 
 document.getElementById('account-button')?.addEventListener('click', () => {
@@ -424,7 +446,7 @@ modalContent?.addEventListener('submit', async (e) => {
 
     if (!isCategoryRelevant(title, desc, category)) {
       modResult.className = 'moderation-result blocked'; 
-      modResult.textContent = `ИИ отклонил проект: Ваше название и описание не соответствуют категории «${category}». Пожалуйста, добавьте ключевые слова по теме.`; 
+      modResult.textContent = `ИИ отклонил проект: Ваше название и описание не соответствуют категории «${category}». Нажмите на кнопку «Ключевые слова [?]» и добавьте нужное слово в описание.`; 
       return;
     }
 
