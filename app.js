@@ -16,7 +16,6 @@ const ALLOWED_CATEGORIES = [
   'Социальное', 'Web3', 'Маркетплейс', 'Искусственный интеллект', 'Игры', 'Приложение'
 ];
 
-// Все слова для подсказок и проверки
 const CATEGORY_KEYWORDS = {
   'Социальное': ['социал', 'общен', 'люди', 'друз', 'связ', 'чат', 'сеть', 'комьюнити', 'сообществ', 'блог', 'форум', 'знаком', 'профил', 'подпис', 'лайк', 'social', 'friend', 'people', 'chat', 'talk'],
   'Web3': ['web3', 'блокчейн', 'крипт', 'токен', 'nft', 'кошел', 'децентрал', 'смарт', 'контракт', 'эфир', 'биткоин', 'монет', 'майнин', 'blockchain', 'crypto', 'wallet', 'token', 'ether'],
@@ -26,38 +25,20 @@ const CATEGORY_KEYWORDS = {
   'Приложение': ['прилож', 'софт', 'программ', 'сервис', 'мобил', 'утилит', 'интерфейс', 'клиент', 'сайт', 'веб', 'телеграм', 'бот', 'андроид', 'ios', 'app', 'site', 'web', 'tool', 'software', 'сервис', 'код']
 };
 
-const BAD_WORDS_LIST = [
-  'хуй', 'хуе', 'хуи', 'пизд', 'ебан', 'ебал', 'ебат', 'ебал', 'бляд', 'блят', 'сука', 'сучк',
-  'манда', 'пидор', 'педик', 'гандон', 'залуп', 'мудак', 'мудил', 'хер', 'порн', 'эрот',
-  'сперм', 'минет', 'куни', 'дроч', 'секс', 'попа', 'жопа', 'кака', 'говно', 'дерьмо', 'писька',
-  'писюн', 'сиськи', 'сисек', 'дурак', 'дура', 'тупой', 'тупая', 'тупые', 'лох', 'чмо',
-  'kaka', 'poop', 'ass', 'butt', 'pussy', 'fuck', 'shit', 'porn', 'sex', 'dick', 'cock'
-];
-
-function hasBadWords(text) {
-  const t = text.toLowerCase().replace(/ё/g, 'е');
-  for (let word of BAD_WORDS_LIST) {
-    const re = new RegExp(`(^|[^а-яa-z])${word}`, 'i');
-    if (re.test(t)) return true;
-  }
-  return false;
-}
-
-function isNonsense(text) {
-  const t = text.trim().toLowerCase();
-  if (t.length < 2) return true;
-  if (/(.)\1{4,}/.test(t)) return true; 
-  const keyboardMashes = ['йцукен', 'фывапр', 'ячсмит', 'qwerty', 'asdfgh', 'zxcvbn', '123456', 'ываол', 'цйукк'];
-  if (keyboardMashes.some(mash => t.includes(mash))) return true;
-  if (/[бвгджзйклмнпрстфхцчшщbcdfghjklmnpqrstvwxyz]{6,}/i.test(t)) return true;
-  return false;
-}
+// Легкая проверка перед отправкой (чтобы не тратить запросы к ИИ на пустоту)
+const BAD_WORDS_LIST = ['хуй', 'хуе', 'хуи', 'пизд', 'ебан', 'ебал', 'ебат', 'бляд', 'сука', 'сучк', 'манда', 'пидор', 'гандон', 'залуп', 'мудак', 'порн', 'секс', 'жопа', 'говно', 'писька', 'fuck', 'shit', 'porn', 'sex', 'dick'];
 
 function validateTextAI(text) {
   const t = String(text || '').trim();
   if (t.length < 2) return { ok: false, msg: 'Слишком коротко.' };
-  if (hasBadWords(t)) return { ok: false, msg: 'Нецензурная лексика, пошлость или обзывательства.' };
-  if (isNonsense(t)) return { ok: false, msg: 'Бессмысленный набор символов или спам.' };
+  
+  const normalized = t.toLowerCase().replace(/ё/g, 'е');
+  for (let word of BAD_WORDS_LIST) {
+    if (normalized.includes(word)) return { ok: false, msg: 'Нецензурная лексика.' };
+  }
+  
+  if (/(.)\1{4,}/.test(t)) return { ok: false, msg: 'Бессмысленный набор символов (слишком много повторов).' };
+  
   return { ok: true };
 }
 
@@ -67,48 +48,6 @@ function isCategoryRelevant(title, description, category) {
   const keywords = CATEGORY_KEYWORDS[category] || [];
   return keywords.some(k => text.includes(k));
 }
-
-// ================= АВТО-УДАЛЕНИЕ =================
-let isSweeping = false;
-async function moderationSweep() {
-  if (isSweeping) return;
-  isSweeping = true;
-  
-  try {
-    const { data: allProjects, error } = await db.from('projects').select('*');
-    if (error) throw error;
-    
-    let deletedCount = 0;
-    
-    for (const p of allProjects) {
-      if (!ALLOWED_CATEGORIES.includes(p.category)) {
-        await db.from('projects').delete().eq('id', p.id);
-        deletedCount++;
-        continue;
-      }
-
-      const titleCheck = validateTextAI(p.title);
-      const descCheck = p.description ? validateTextAI(p.description) : { ok: true };
-      const catCheck = isCategoryRelevant(p.title, p.description || '', p.category);
-      
-      if (!titleCheck.ok || !descCheck.ok || !catCheck) {
-        await db.from('projects').delete().eq('id', p.id);
-        deletedCount++;
-      }
-    }
-    
-    if (deletedCount > 0) {
-      loadProjects();
-      showToast(`ИИ-смотритель удалил ${deletedCount} нарушающих правила проектов.`);
-    }
-  } catch (err) {
-    console.error("Ошибка при очистке:", err);
-  } finally {
-    isSweeping = false;
-  }
-}
-
-setInterval(moderationSweep, 10000);
 
 // ================= АВТОРИЗАЦИЯ =================
 db.auth.onAuthStateChange((event, session) => {
@@ -135,7 +74,13 @@ function updateAccountButton() {
 
 // ================= ЗАГРУЗКА ДАННЫХ =================
 async function loadProjects() {
-  const { data, error } = await db.from('projects').select('*').order('created_at', { ascending: false });
+  // ВАЖНО: Загружаем ТОЛЬКО одобренные ИИ проекты (is_approved = true)
+  const { data, error } = await db
+    .from('projects')
+    .select('*')
+    .eq('is_approved', true) 
+    .order('created_at', { ascending: false });
+    
   if (!error) { projects = data; render(); }
 }
 
@@ -215,7 +160,7 @@ function showToast(text) {
   const el = document.getElementById('toast');
   if (!el) return;
   el.textContent = text; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 4000);
+  setTimeout(() => el.classList.remove('show'), 5000);
 }
 
 function showPasswordResetForm() {
@@ -436,31 +381,36 @@ modalContent?.addEventListener('submit', async (e) => {
       return;
     }
 
+    // Легкая проверка перед отправкой в базу (чтобы не гонять пустоту)
     const titleCheck = validateTextAI(title);
     if (!titleCheck.ok) { modResult.className = 'moderation-result blocked'; modResult.textContent = 'ИИ отклонил название: ' + titleCheck.msg; return; }
     
-    if (desc) {
-      const descCheck = validateTextAI(desc);
-      if (!descCheck.ok) { modResult.className = 'moderation-result blocked'; modResult.textContent = 'ИИ отклонил описание: ' + descCheck.msg; return; }
-    }
-
     if (!isCategoryRelevant(title, desc, category)) {
       modResult.className = 'moderation-result blocked'; 
       modResult.textContent = `ИИ отклонил проект: Ваше название и описание не соответствуют категории «${category}». Нажмите на кнопку «Ключевые слова [?]» и добавьте нужное слово в описание.`; 
       return;
     }
 
-    modResult.className = 'moderation-result checking'; modResult.textContent = 'ИИ анализирует...';
-    const btn = form.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'ПУБЛИКАЦИЯ...';
+    modResult.className = 'moderation-result checking'; modResult.textContent = 'Отправляем проект на проверку ИИ...';
+    const btn = form.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'ОТПРАВКА...';
     await new Promise(r => setTimeout(r, 800));
 
+    // ВАЖНО: ставим is_approved: false. ИИ в Make.com проверит и поставит true
     const { error } = await db.from('projects').insert([{
       title, description: desc, category: category, screenshot: form.screenshot.value, secret,
-      owner_id: currentUser.id, owner_name: currentUser.username, liked_by: [], comments: []
+      owner_id: currentUser.id, owner_name: currentUser.username, liked_by: [], comments: [],
+      is_approved: false 
     }]);
 
-    if (error) { modResult.className = 'moderation-result blocked'; modResult.textContent = 'Ошибка БД: ' + error.message; btn.disabled = false; btn.textContent = 'ЗАЖЕЧЬ ПОСЛЕДНЮЮ СВЕЧУ ↗'; }
-    else { closeModal(); showToast('Проект опубликован!'); loadProjects(); }
+    if (error) { 
+      modResult.className = 'moderation-result blocked'; 
+      modResult.textContent = 'Ошибка БД: ' + error.message; 
+      btn.disabled = false; btn.textContent = 'ЗАЖЕЧЬ ПОСЛЕДНЮЮ СВЕЧУ ↗'; 
+    } else { 
+      closeModal(); 
+      showToast('Проект отправлен! ИИ проверяет его. Он появится в ленте, если пройдет модерацию.'); 
+      loadProjects(); 
+    }
     return;
   }
 
@@ -497,7 +447,7 @@ modalContent?.addEventListener('submit', async (e) => {
     localStorage.setItem('tdg_support_time', Date.now().toString());
 
     result.className = 'support-result success';
-    result.textContent = 'ИИ одобрил. Обращение доставлено в закрытый ящик автора!';
+    result.textContent = 'Обращение доставлено в закрытый ящик автора!';
     btn.disabled = false; btn.textContent = 'ОТПРАВИТЬ ОБРАЩЕНИЕ ↗';
     form.reset();
     return;
